@@ -15,6 +15,8 @@ class CenterNetGT(object):
         output_size = config.INPUT.OUTPUT_SIZE
         min_overlap = config.MODEL.CENTERNET.MIN_OVERLAP
         tensor_dim = config.MODEL.CENTERNET.TENSOR_DIM
+        gaussian_ratio = config.MODEL.CENTERNET.GAUSSIAN_RATIO
+        num_objects = config.MODEL.CENTERNET.NUM_OBJECTS
 
         scoremap_list, wh_list, reg_list, reg_mask_list, index_list = [[] for i in range(5)]
         for data in batched_input:
@@ -23,11 +25,12 @@ class CenterNetGT(object):
             bbox_dict = data['instances'].get_fields()
 
             # init gt tensors
-            gt_scoremap = torch.zeros(num_classes, *output_size)
-            gt_wh = torch.zeros(tensor_dim, 2)
-            gt_reg = torch.zeros_like(gt_wh)
-            reg_mask = torch.zeros(tensor_dim)
-            gt_index = torch.zeros(tensor_dim)
+            # gt_scoremap = torch.zeros(num_classes, *output_size)
+            gt_scoremap = torch.zeros(num_objects, *output_size)
+            gt_wh = torch.zeros(num_objects, 2)
+            # gt_reg = torch.zeros_like(gt_wh)
+            # reg_mask = torch.zeros(tensor_dim)
+            # gt_index = torch.zeros(tensor_dim)
             # pass
 
             boxes, classes = bbox_dict['gt_boxes'], bbox_dict['gt_classes']
@@ -36,9 +39,11 @@ class CenterNetGT(object):
 
             centers = boxes.get_centers()
             centers_int = centers.to(torch.int32)
-            gt_index[:num_boxes] = centers_int[..., 1] * output_size[1] + centers_int[..., 0]
-            gt_reg[:num_boxes] = centers - centers_int
-            reg_mask[:num_boxes] = 1
+            centers_pos = centers_int.sum(dim=-1)
+            _, center_index = torch.sort(centers_pos)
+            # gt_index[:num_boxes] = centers_int[..., 1] * output_size[1] + centers_int[..., 0]
+            # gt_reg[:num_boxes] = centers - centers_int
+            # reg_mask[:num_boxes] = 1
 
             wh = torch.zeros_like(centers)
             box_tensor = boxes.tensor
@@ -46,33 +51,39 @@ class CenterNetGT(object):
             wh[..., 1] = box_tensor[..., 3] - box_tensor[..., 1]
             CenterNetGT.generate_score_map(
                 gt_scoremap, classes, wh,
-                centers_int, min_overlap,
+                centers_int, min_overlap, gaussian_ratio
             )
             gt_wh[:num_boxes] = wh
 
-            scoremap_list.append(gt_scoremap)
-            wh_list.append(gt_wh)
-            reg_list.append(gt_reg)
-            reg_mask_list.append(reg_mask)
-            index_list.append(gt_index)
+            # center_index = torch.cat([center_index, torch.zeros(num_objects - num_boxes).long()], dim=0)
+            gt_scoremap = gt_scoremap.index_select(0, center_index)
+            gt_scoremap = torch.cat([gt_scoremap, torch.zeros(num_objects - num_boxes, 128, 128)], dim=0)
 
-        gt_dict = {
-            "score_map": torch.stack(scoremap_list, dim=0),
-            "wh": torch.stack(wh_list, dim=0),
-            "reg": torch.stack(reg_list, dim=0),
-            "reg_mask": torch.stack(reg_mask_list, dim=0),
-            "index": torch.stack(index_list, dim=0),
-        }
+
+            scoremap_list.append(gt_scoremap)
+            # wh_list.append(gt_wh)
+            # reg_list.append(gt_reg)
+            # reg_mask_list.append(reg_mask)
+            # index_list.append(gt_index)
+
+        # gt_dict = {
+        #     "score_map": torch.stack(scoremap_list, dim=0),
+        #     "wh": torch.stack(wh_list, dim=0),
+        #     "reg": torch.stack(reg_list, dim=0),
+        #     "reg_mask": torch.stack(reg_mask_list, dim=0),
+        #     "index": torch.stack(index_list, dim=0),
+        # }
+        gt_dict = {"score_map": torch.stack(scoremap_list, dim=0), }
         return gt_dict
 
     @staticmethod
-    def generate_score_map(fmap, gt_class, gt_wh, centers_int, min_overlap):
+    def generate_score_map(fmap, gt_class, gt_wh, centers_int, min_overlap, gaussian_ratio):
         radius = CenterNetGT.get_gaussian_radius(gt_wh, min_overlap)
         radius = torch.clamp_min(radius, 0)
         radius = radius.type(torch.int).cpu().numpy()
         for i in range(gt_class.shape[0]):
             channel_index = gt_class[i]
-            CenterNetGT.draw_gaussian(fmap[channel_index], centers_int[i], radius[i])
+            CenterNetGT.draw_gaussian(fmap[channel_index], centers_int[i], (radius[i] * gaussian_ratio).astype(int))
 
     @staticmethod
     def get_gaussian_radius(box_size, min_overlap):

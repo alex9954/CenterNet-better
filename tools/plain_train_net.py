@@ -162,7 +162,7 @@ def do_train(cfg, model, resume=False):
                 # Compared to "train_net.py", the test results are not dumped to EventStorage
                 comm.synchronize()
 
-            if iteration - start_iter > 5 and (iteration % 20 == 0 or iteration == max_iter):
+            if iteration - start_iter > 5 and (iteration % 2000 == 0 or iteration == max_iter):
                 for writer in writers:
                     writer.write()
             periodic_checkpointer.step(iteration)

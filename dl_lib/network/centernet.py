@@ -103,30 +103,31 @@ class CenterNet(nn.Module):
 
         loss_cls = modified_focal_loss(pred_score, gt_dict['score_map'])
 
-        mask = gt_dict['reg_mask']
-        index = gt_dict['index']
-        index = index.to(torch.long)
-        # width and height loss, better version
-        loss_wh = reg_l1_loss(pred_dict['wh'], mask, index, gt_dict['wh'])
+        # mask = gt_dict['reg_mask']
+        # index = gt_dict['index']
+        # index = index.to(torch.long)
+        # # width and height loss, better version
+        # loss_wh = reg_l1_loss(pred_dict['wh'], mask, index, gt_dict['wh'])
+        #
+        # # regression loss
+        # loss_reg = reg_l1_loss(pred_dict['reg'], mask, index, gt_dict['reg'])
 
-        # regression loss
-        loss_reg = reg_l1_loss(pred_dict['reg'], mask, index, gt_dict['reg'])
-
-        loss_cls *= self.cfg.MODEL.LOSS.CLS_WEIGHT
-        loss_wh *= self.cfg.MODEL.LOSS.WH_WEIGHT
-        loss_reg *= self.cfg.MODEL.LOSS.REG_WEIGHT
-
-        loss = {
-            "loss_cls": loss_cls,
-            "loss_box_wh": loss_wh,
-            "loss_center_reg": loss_reg,
-        }
+        # loss_cls *= self.cfg.MODEL.LOSS.CLS_WEIGHT
+        # loss_wh *= self.cfg.MODEL.LOSS.WH_WEIGHT
+        # loss_reg *= self.cfg.MODEL.LOSS.REG_WEIGHT
+        #
+        # loss = {
+        #     "loss_cls": loss_cls,
+        #     "loss_box_wh": loss_wh,
+        #     "loss_center_reg": loss_reg,
+        # }
+        loss = {"loss_cls": loss_cls, }
         # print(loss)
         return loss
 
     @torch.no_grad()
     def get_ground_truth(self, batched_inputs):
-        return CenterNetGT.generate(self.cfg, batched_inputs)
+        return CenterNetGT.generate(self.cfg, batched_inputs, )
 
     @torch.no_grad()
     def inference(self, images):

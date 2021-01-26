@@ -30,7 +30,7 @@ class CenternetHead(nn.Module):
         super(CenternetHead, self).__init__()
         self.cls_head = SingleHead(
             64,
-            cfg.MODEL.CENTERNET.NUM_CLASSES,
+            cfg.MODEL.CENTERNET.NUM_OBJECTS,
             bias_fill=True,
             bias_value=cfg.MODEL.CENTERNET.BIAS_VALUE,
         )
@@ -40,11 +40,12 @@ class CenternetHead(nn.Module):
     def forward(self, x):
         cls = self.cls_head(x)
         cls = torch.sigmoid(cls)
-        wh = self.wh_head(x)
-        reg = self.reg_head(x)
-        pred = {
-            'cls': cls,
-            'wh': wh,
-            'reg': reg
-        }
+        # wh = self.wh_head(x)
+        # reg = self.reg_head(x)
+        # pred = {
+        #     'cls': cls,
+        #     'wh': wh,
+        #     'reg': reg
+        # }
+        pred = {'cls': cls}
         return pred

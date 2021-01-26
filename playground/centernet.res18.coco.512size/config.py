@@ -11,11 +11,14 @@ _config_dict = dict(
             DECONV_CHANNEL=[512, 256, 128, 64],
             DECONV_KERNEL=[4, 4, 4],
             NUM_CLASSES=80,
+            NUM_OBJECTS=100,
             MODULATE_DEFORM=True,
             BIAS_VALUE=-2.19,
             DOWN_SCALE=4,
             MIN_OVERLAP=0.7,
             TENSOR_DIM=128,
+            GAUSSIAN_RATIO=0.1,
+            DOT_NUMBER=10,
         ),
         LOSS=dict(
             CLS_WEIGHT=1,
@@ -43,7 +46,7 @@ _config_dict = dict(
         OUTPUT_SIZE=(128, 128),
     ),
     DATALOADER=dict(
-        NUM_WORKERS=4,
+        NUM_WORKERS=0,
     ),
     DATASETS=dict(
         TRAIN=("coco_2017_train",),
@@ -61,12 +64,13 @@ _config_dict = dict(
             MAX_ITER=126000,
             WARMUP_ITERS=1000,
         ),
-        IMS_PER_BATCH=128,
+        IMS_PER_BATCH=16,
+        CHECKPOINT_PERIOD=600,
     ),
-    OUTPUT_DIR=osp.join(
-        '/data/Outputs/model_logs/playground',
-        osp.split(osp.realpath(__file__))[0].split("playground/")[-1]
-    ),
+     OUTPUT_DIR=osp.join(
+         './data/Outputs/model_logs/playground',
+         osp.split(osp.realpath(__file__))[0].split("playground/")[-1]
+     ),
     GLOBAL=dict(DUMP_TEST=False)
 )
 

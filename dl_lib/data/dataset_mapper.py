@@ -45,6 +45,8 @@ class DatasetMapper:
 
         self.tfm_gens = utils.build_transform_gen(cfg, is_train)
 
+        self.dot_number = cfg.MODEL.CENTERNET.DOT_NUMBER
+
         # fmt: off
         self.img_format     = cfg.INPUT.FORMAT
         self.mask_on        = cfg.MODEL.MASK_ON
@@ -128,7 +130,8 @@ class DatasetMapper:
             # USER: Implement additional transformations if you have other types of data
             annos = [
                 utils.transform_instance_annotations(
-                    obj, transforms, image_shape, keypoint_hflip_indices=self.keypoint_hflip_indices
+                    obj, transforms, image_shape, keypoint_hflip_indices=self.keypoint_hflip_indices,
+                    dot_number=self.dot_number
                 )
                 for obj in dataset_dict.pop("annotations")
                 if obj.get("iscrowd", 0) == 0

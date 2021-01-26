@@ -133,7 +133,7 @@ def transform_proposals(
 
 
 def transform_instance_annotations(
-    annotation, transforms, image_size, *, keypoint_hflip_indices=None
+    annotation, transforms, image_size, *, keypoint_hflip_indices=None, dot_number
 ):
     """
     Apply transforms to box, segmentation and keypoints annotations of a single instance.
@@ -165,7 +165,19 @@ def transform_instance_annotations(
 
     if "segmentation" in annotation:
         # each instance contains 1 or more polygons
-        polygons = [np.asarray(p).reshape(-1, 2) for p in annotation["segmentation"]]
+        polygons = []
+        for p in annotation["segmentation"]:
+            dot_counts = [len(i) for i in p]
+            dot_gap = [i // (2 * dot_number) for i in dot_counts]
+            pick_out_dot = []
+            for i, j in zip(p, dot_gap):
+                result = []
+                for k in range(0, len(i), j):
+                    result.append(i[k])
+                    result.append(i[k + 1])
+                pick_out_dot.append(result)
+            polygons.append(np.asarray(pick_out_dot).reshape(-1, 2))
+        # polygons = [np.asarray(p).reshape(-1, 2) for p in annotation["segmentation"]]
         annotation["segmentation"] = [
             p.reshape(-1) for p in transforms.apply_polygons(polygons)
         ]
