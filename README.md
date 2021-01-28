@@ -76,15 +76,3 @@ dl_test --num-gpus 8  MODEL.WEIGHTS path/to/your/save_dir/ckpt.pth
 
 please refer to  [google python coding style](https://zh-google-styleguide.readthedocs.io/en/latest/google-python-styleguide/python_style_rules/)
 
-## Citing CenterNet-better
-
-If you use CenterNet-better in your research or wish to refer to the baseline results published in this repo, please use the following BibTeX entry.
-
-```BibTeX
-@misc{wang2020centernet_better,
-  author =       {Feng Wang},
-  title =        {CenterNet-better},
-  howpublished = {\url{https://github.com/FateScript/CenterNet-better}},
-  year =         {2020}
-}
-```
