@@ -46,7 +46,7 @@ _config_dict = dict(
         OUTPUT_SIZE=(128, 128),
     ),
     DATALOADER=dict(
-        NUM_WORKERS=4,
+        NUM_WORKERS=1,
     ),
     DATASETS=dict(
         TRAIN=("coco_2017_train",),

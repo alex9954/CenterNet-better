@@ -3,7 +3,7 @@ from dl_lib.configs.base_detection_config import BaseDetectionConfig
 
 _config_dict = dict(
     MODEL=dict(
-        WEIGHTS="",
+        WEIGHTS="/home/amax/git_projects/CenterNet-better/playground/centernet.res18.coco.512size/data/Outputs/model_logs/playground/centernet.res18.coco.512size/model_0013799.pth",
         RESNETS=dict(DEPTH=18),
         PIXEL_MEAN=[0.485, 0.456, 0.406],
         PIXEL_STD=[0.229, 0.224, 0.225],
@@ -17,7 +17,7 @@ _config_dict = dict(
             DOWN_SCALE=4,
             MIN_OVERLAP=0.7,
             TENSOR_DIM=128,
-            GAUSSIAN_RATIO=0.1,
+            GAUSSIAN_RATIO=0.5,
             DOT_NUMBER=10,
         ),
         LOSS=dict(
@@ -25,6 +25,7 @@ _config_dict = dict(
             WH_WEIGHT=0.1,
             REG_WEIGHT=1,
         ),
+        MASK_ON=True,
     ),
     INPUT=dict(
         AUG=dict(
@@ -55,7 +56,7 @@ _config_dict = dict(
     SOLVER=dict(
         OPTIMIZER=dict(
             NAME="SGD",
-            BASE_LR=0.02,
+            BASE_LR=0.01,
             WEIGHT_DECAY=1e-4,
         ),
         LR_SCHEDULER=dict(
@@ -65,7 +66,7 @@ _config_dict = dict(
             WARMUP_ITERS=1000,
         ),
         IMS_PER_BATCH=16,
-        CHECKPOINT_PERIOD=600,
+        CHECKPOINT_PERIOD=10000,
     ),
      OUTPUT_DIR=osp.join(
          './data/Outputs/model_logs/playground',

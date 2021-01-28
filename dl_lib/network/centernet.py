@@ -10,6 +10,8 @@ from dl_lib.structures import Boxes, ImageList, Instances
 from .generator import CenterNetDecoder, CenterNetGT
 from .loss import modified_focal_loss, reg_l1_loss
 
+import matplotlib.pyplot as plt
+
 
 class CenterNet(nn.Module):
     """
@@ -66,6 +68,9 @@ class CenterNet(nn.Module):
 
         if not self.training:
             return self.inference(images)
+
+        gt_dict = self.get_ground_truth(batched_inputs)
+        self.inference(images, gt_dict)
 
         features = self.backbone(images.tensor)
         up_fmap = self.upsample(features)
@@ -130,7 +135,7 @@ class CenterNet(nn.Module):
         return CenterNetGT.generate(self.cfg, batched_inputs, )
 
     @torch.no_grad()
-    def inference(self, images):
+    def inference(self, images, gt_dict):
         """
         image(tensor): ImageList in dl_lib.structures
         """
@@ -153,32 +158,61 @@ class CenterNet(nn.Module):
         features = self.backbone(aligned_img)
         up_fmap = self.upsample(features)
         pred_dict = self.head(up_fmap)
-        results = self.decode_prediction(pred_dict, img_info)
+        results = self.decode_prediction(pred_dict, img_info, images, gt_dict)
 
         ori_w, ori_h = img_info['center'] * 2
         det_instance = Instances((int(ori_h), int(ori_w)), **results)
 
         return [{"instances": det_instance}]
 
-    def decode_prediction(self, pred_dict, img_info):
+    def decode_prediction(self, pred_dict, img_info, images, gt_dict):
         """
         Args:
             pred_dict(dict): a dict contains all information of prediction
             img_info(dict): a dict contains needed information of origin image
         """
         fmap = pred_dict["cls"]
-        reg = pred_dict["reg"]
-        wh = pred_dict["wh"]
+        # reg = pred_dict["reg"]
+        # wh = pred_dict["wh"]
 
-        boxes, scores, classes = CenterNetDecoder.decode(fmap, wh, reg)
-        # boxes = Boxes(boxes.reshape(boxes.shape[-2:]))
-        scores = scores.reshape(-1)
-        classes = classes.reshape(-1).to(torch.int64)
+        # boxes, scores, classes = CenterNetDecoder.decode(fmap, wh, reg)
+        # # boxes = Boxes(boxes.reshape(boxes.shape[-2:]))
+        # scores = scores.reshape(-1)
+        # classes = classes.reshape(-1).to(torch.int64)
 
-        # dets = CenterNetDecoder.decode(fmap, wh, reg)
-        boxes = CenterNetDecoder.transform_boxes(boxes, img_info)
-        boxes = Boxes(boxes)
-        return dict(pred_boxes=boxes, scores=scores, pred_classes=classes)
+        # # dets = CenterNetDecoder.decode(fmap, wh, reg)
+        # boxes = CenterNetDecoder.transform_boxes(boxes, img_info)
+        # boxes = Boxes(boxes)
+        # return dict(pred_boxes=boxes, scores=scores, pred_classes=classes)
+
+        gt_scoremap = gt_dict['score_map']
+        gt_scoremap = gt_scoremap.cpu().numpy()[0]
+        gt_scoremap *= 10
+        images = images.tensor
+        images = images[0].permute(1, 2, 0)
+        images = images.cpu()
+        fmap = fmap.cpu()
+        plt.figure()
+        plt.imshow(images.numpy(), origin='upper')
+        plt.figure()
+        plt.subplot(421)
+        plt.imshow(fmap.cpu().numpy()[0][0], origin='upper')
+        plt.subplot(422)
+        plt.imshow(gt_scoremap[0], origin='upper')
+        plt.subplot(423)
+        plt.imshow(fmap.cpu().numpy()[0][1], origin='upper')
+        plt.subplot(424)
+        plt.imshow(gt_scoremap[1], origin='upper')
+        plt.subplot(425)
+        plt.imshow(fmap.cpu().numpy()[0][2], origin='upper')
+        plt.subplot(426)
+        plt.imshow(gt_scoremap[2], origin='upper')
+        plt.subplot(427)
+        plt.imshow(fmap.cpu().numpy()[0][3], origin='upper')
+        plt.subplot(428)
+        plt.imshow(gt_scoremap[3], origin='upper')
+        plt.show()
+
 
     def preprocess_image(self, batched_inputs):
         """

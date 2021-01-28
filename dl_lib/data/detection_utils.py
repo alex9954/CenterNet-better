@@ -165,18 +165,13 @@ def transform_instance_annotations(
 
     if "segmentation" in annotation:
         # each instance contains 1 or more polygons
-        polygons = []
-        for p in annotation["segmentation"]:
-            dot_counts = [len(i) for i in p]
-            dot_gap = [i // (2 * dot_number) for i in dot_counts]
-            pick_out_dot = []
-            for i, j in zip(p, dot_gap):
-                result = []
-                for k in range(0, len(i), j):
-                    result.append(i[k])
-                    result.append(i[k + 1])
-                pick_out_dot.append(result)
-            polygons.append(np.asarray(pick_out_dot).reshape(-1, 2))
+        dot_counts = [len(i) // 2 for i in annotation["segmentation"]]
+        dot_gap = [i // dot_number if i >= dot_number else 1 for i in dot_counts]
+        x = [i[0::j] for i, j in zip(annotation["segmentation"], dot_gap)]
+        y = [i[1::j] for i, j in zip(annotation["segmentation"], dot_gap)]
+        x = [[i[:dot_number]] if len(i) >= dot_number else [i + [-1] * (dot_number - len(i))] for i in x]
+        y = [[i[:dot_number]] if len(i) >= dot_number else [i + [-1] * (dot_number - len(i))] for i in y]
+        polygons = [np.concatenate([np.asarray(i), np.asarray(j)], axis=0).T for i, j in zip(x, y)]
         # polygons = [np.asarray(p).reshape(-1, 2) for p in annotation["segmentation"]]
         annotation["segmentation"] = [
             p.reshape(-1) for p in transforms.apply_polygons(polygons)

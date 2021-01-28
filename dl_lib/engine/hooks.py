@@ -149,7 +149,7 @@ class PeriodicWriter(HookBase):
     It is executed every ``period`` iterations and after the last iteration.
     """
 
-    def __init__(self, writers, period=20):
+    def __init__(self, writers, period=200):
         """
         Args:
             writers (list[EventWriter]): a list of EventWriter objects
