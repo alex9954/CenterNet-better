@@ -69,8 +69,8 @@ class CenterNet(nn.Module):
         if not self.training:
             return self.inference(images)
 
-        gt_dict = self.get_ground_truth(batched_inputs)
-        self.inference(images, gt_dict)
+        # gt_dict = self.get_ground_truth(batched_inputs)
+        # self.inference(images, gt_dict)
 
         features = self.backbone(images.tensor)
         up_fmap = self.upsample(features)

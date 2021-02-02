@@ -18,7 +18,7 @@ class CenterNetGT(object):
         gaussian_ratio = config.MODEL.CENTERNET.GAUSSIAN_RATIO
         num_objects = config.MODEL.CENTERNET.NUM_OBJECTS
 
-        scoremap_list, wh_list, reg_list, reg_mask_list, index_list = [[] for i in range(5)]
+        scoremap_list, wh_list, reg_list, reg_mask_list, index_list, object_count_list, mask_point_list = [[] for i in range(7)]
         for data in batched_input:
             # img_size = (data['height'], data['width'])
 
@@ -62,6 +62,8 @@ class CenterNetGT(object):
 
 
             scoremap_list.append(gt_scoremap)
+            object_count_list.append(num_boxes)
+            mask_point_list.append(mask_point.polygons[:, 0])
             # wh_list.append(gt_wh)
             # reg_list.append(gt_reg)
             # reg_mask_list.append(reg_mask)
@@ -74,7 +76,10 @@ class CenterNetGT(object):
         #     "reg_mask": torch.stack(reg_mask_list, dim=0),
         #     "index": torch.stack(index_list, dim=0),
         # }
-        gt_dict = {"score_map": torch.stack(scoremap_list, dim=0), }
+        gt_dict = {"score_map": torch.stack(scoremap_list, dim=0),
+                   "object_count": torch.stack(object_count_list, dim=0),
+                   "mask_point": torch.stack(mask_point_list, dim=0),
+                   }
         return gt_dict
 
     @staticmethod
