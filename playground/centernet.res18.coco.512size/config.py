@@ -19,10 +19,11 @@ _config_dict = dict(
             TENSOR_DIM=128,
             GAUSSIAN_RATIO=0.5,
             DOT_NUMBER=10,
+            IMAGE_SIZE=512,
         ),
         LOSS=dict(
-            CLS_WEIGHT=1,
-            WH_WEIGHT=0.1,
+            MAP_WEIGHT=1,
+            LSTM_WEIGHT=1,
             REG_WEIGHT=1,
         ),
         MASK_ON=True,

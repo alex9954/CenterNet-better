@@ -4,6 +4,7 @@ from dl_lib.network import ResnetBackbone
 from dl_lib.network import CenternetDeconv
 from dl_lib.network import CenternetHead
 from dl_lib.network import CenterNet
+from dl_lib.network import LSTMhead
 
 
 def build_backbone(cfg, input_shape=None):
@@ -31,10 +32,16 @@ def build_head(cfg, ):
     return head
 
 
+def build_lstm(cfg, ):
+    lstm_head = LSTMhead(cfg)
+    return lstm_head
+
+
 def build_model(cfg):
 
     cfg.build_backbone = build_backbone
     cfg.build_upsample_layers = build_upsample_layers
     cfg.build_head = build_head
+    cfg.build_lstm = build_lstm
     model = CenterNet(cfg)
     return model

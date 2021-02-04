@@ -60,7 +60,6 @@ class CenterNetGT(object):
             # gt_scoremap = gt_scoremap.index_select(0, center_index)
             # gt_scoremap = torch.cat([gt_scoremap, torch.zeros(num_objects - num_boxes, 128, 128)], dim=0)
 
-
             scoremap_list.append(gt_scoremap)
             object_count_list.append(num_boxes)
             mask_point_list.append(mask_point.polygons[:, 0])

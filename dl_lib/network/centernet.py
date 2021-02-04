@@ -3,6 +3,7 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from dl_lib.layers import ShapeSpec
 from dl_lib.structures import Boxes, ImageList, Instances
@@ -33,7 +34,8 @@ class CenterNet(nn.Module):
             cfg, input_shape=ShapeSpec(channels=len(cfg.MODEL.PIXEL_MEAN))
         )
         self.upsample = cfg.build_upsample_layers(cfg)
-        self.head = cfg.build_head(cfg)
+        self.scoremap_head = cfg.build_head(cfg)
+        self.lstm_head = cfg.build_lstm
         # self.cls_head = cfg.build_cls_head(cfg)
         # self.wh_head = cfg.build_width_height_head(cfg)
         # self.reg_head = cfg.build_center_reg_head(cfg)
@@ -69,14 +71,19 @@ class CenterNet(nn.Module):
         if not self.training:
             return self.inference(images)
 
-        # gt_dict = self.get_ground_truth(batched_inputs)
+        gt_dict = self.get_ground_truth(batched_inputs)
         # self.inference(images, gt_dict)
 
         features = self.backbone(images.tensor)
         up_fmap = self.upsample(features)
-        pred_dict = self.head(up_fmap)
+        scoremap = self.scoremap_head(up_fmap)
+        keypoints = self.lstm_head(up_fmap, gt_dict)
+        pred_dict = {
+            "scoremap": scoremap,
+            "keypoints": keypoints,
+        }
 
-        gt_dict = self.get_ground_truth(batched_inputs)
+        # gt_dict = self.get_ground_truth(batched_inputs)
 
         return self.losses(pred_dict, gt_dict)
 
@@ -101,14 +108,16 @@ class CenterNet(nn.Module):
         }
         """
         # scoremap loss
-        pred_score = pred_dict['cls']
-        cur_device = pred_score.device
+        pred_scoremap = pred_dict['scoremap']
+        cur_device = pred_scoremap.device
         for k in gt_dict:
             gt_dict[k] = gt_dict[k].to(cur_device)
 
-        loss_cls = modified_focal_loss(pred_score, gt_dict['score_map'])
+        loss_map = modified_focal_loss(pred_scoremap, gt_dict['score_map'])
 
-        # mask = gt_dict['reg_mask']
+        gt_keypoint = gt_dict['mask_point'] / self.cfg.MODEL.CENTERNET.IMAGE_SIZE
+        keypoints = pred_dict['keypoints']
+        loss_lstm = F.l1_loss(keypoints, gt_keypoint, reduction='mean')
         # index = gt_dict['index']
         # index = index.to(torch.long)
         # # width and height loss, better version
@@ -117,6 +126,8 @@ class CenterNet(nn.Module):
         # # regression loss
         # loss_reg = reg_l1_loss(pred_dict['reg'], mask, index, gt_dict['reg'])
 
+        loss_map *= self.cfg.MODEL.LOSS.MAP_WEIGHT
+        loss_lstm *= self.cfg.MODEL.LOSS.LSTM_WEIGHT
         # loss_cls *= self.cfg.MODEL.LOSS.CLS_WEIGHT
         # loss_wh *= self.cfg.MODEL.LOSS.WH_WEIGHT
         # loss_reg *= self.cfg.MODEL.LOSS.REG_WEIGHT
@@ -126,7 +137,9 @@ class CenterNet(nn.Module):
         #     "loss_box_wh": loss_wh,
         #     "loss_center_reg": loss_reg,
         # }
-        loss = {"loss_cls": loss_cls, }
+        loss = {"loss_scoremap": loss_map,
+                "loss_lstm": loss_lstm,
+                }
         # print(loss)
         return loss
 
@@ -157,7 +170,7 @@ class CenterNet(nn.Module):
 
         features = self.backbone(aligned_img)
         up_fmap = self.upsample(features)
-        pred_dict = self.head(up_fmap)
+        pred_dict = self.scoremap_head(up_fmap)
         results = self.decode_prediction(pred_dict, img_info, images, gt_dict)
 
         ori_w, ori_h = img_info['center'] * 2

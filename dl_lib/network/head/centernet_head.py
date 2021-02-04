@@ -38,8 +38,8 @@ class CenternetHead(nn.Module):
         self.reg_head = SingleHead(64, 2)
 
     def forward(self, x):
-        cls = self.cls_head(x)
-        cls = torch.sigmoid(cls)
+        scoremap = self.cls_head(x)
+        scoremap = torch.sigmoid(scoremap)
         # wh = self.wh_head(x)
         # reg = self.reg_head(x)
         # pred = {
@@ -47,5 +47,4 @@ class CenternetHead(nn.Module):
         #     'wh': wh,
         #     'reg': reg
         # }
-        pred = {'cls': cls}
-        return pred
+        return scoremap
