@@ -35,7 +35,7 @@ class CenterNet(nn.Module):
         )
         self.upsample = cfg.build_upsample_layers(cfg)
         self.scoremap_head = cfg.build_head(cfg)
-        self.lstm_head = cfg.build_lstm
+        self.lstm_head = cfg.build_lstm(cfg)
         # self.cls_head = cfg.build_cls_head(cfg)
         # self.wh_head = cfg.build_width_height_head(cfg)
         # self.reg_head = cfg.build_center_reg_head(cfg)

@@ -3,7 +3,7 @@ from dl_lib.configs.base_detection_config import BaseDetectionConfig
 
 _config_dict = dict(
     MODEL=dict(
-        WEIGHTS="/home/amax/git_projects/CenterNet-better/playground/centernet.res18.coco.512size/data/Outputs/model_logs/playground/centernet.res18.coco.512size/model_0013799.pth",
+        WEIGHTS="",
         RESNETS=dict(DEPTH=18),
         PIXEL_MEAN=[0.485, 0.456, 0.406],
         PIXEL_STD=[0.229, 0.224, 0.225],
@@ -20,6 +20,7 @@ _config_dict = dict(
             GAUSSIAN_RATIO=0.5,
             DOT_NUMBER=10,
             IMAGE_SIZE=512,
+            DOT_DIMENSION=128,
         ),
         LOSS=dict(
             MAP_WEIGHT=1,
@@ -31,6 +32,7 @@ _config_dict = dict(
     INPUT=dict(
         AUG=dict(
             TRAIN_PIPELINES=[
+                # ('Resize', dict(shape=512)),
                 ('CenterAffine', dict(
                     boarder=128,
                     output_size=(512, 512),
