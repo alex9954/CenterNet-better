@@ -32,7 +32,6 @@ _config_dict = dict(
     INPUT=dict(
         AUG=dict(
             TRAIN_PIPELINES=[
-                # ('Resize', dict(shape=512)),
                 ('CenterAffine', dict(
                     boarder=128,
                     output_size=(512, 512),

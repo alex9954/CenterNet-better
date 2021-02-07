@@ -77,7 +77,7 @@ class CenterNet(nn.Module):
         features = self.backbone(images.tensor)
         up_fmap = self.upsample(features)
         scoremap = self.scoremap_head(up_fmap)
-        keypoints = self.lstm_head(up_fmap, gt_dict)
+        keypoints, gt_keypoints = self.lstm_head(up_fmap, gt_dict)
         pred_dict = {
             "scoremap": scoremap,
             "keypoints": keypoints,
@@ -85,9 +85,9 @@ class CenterNet(nn.Module):
 
         # gt_dict = self.get_ground_truth(batched_inputs)
 
-        return self.losses(pred_dict, gt_dict)
+        return self.losses(pred_dict, gt_dict, gt_keypoints)
 
-    def losses(self, pred_dict, gt_dict):
+    def losses(self, pred_dict, gt_dict, gt_keypoints):
         r"""
         calculate losses of pred and gt
 
@@ -111,13 +111,14 @@ class CenterNet(nn.Module):
         pred_scoremap = pred_dict['scoremap']
         cur_device = pred_scoremap.device
         for k in gt_dict:
-            gt_dict[k] = gt_dict[k].to(cur_device)
+            if k != 'mask_point':
+                gt_dict[k] = gt_dict[k].to(cur_device)
 
         loss_map = modified_focal_loss(pred_scoremap, gt_dict['score_map'])
 
-        gt_keypoint = gt_dict['mask_point'] / self.cfg.MODEL.CENTERNET.IMAGE_SIZE
+        gt_keypoints = gt_keypoints / self.cfg.MODEL.CENTERNET.IMAGE_SIZE
         keypoints = pred_dict['keypoints']
-        loss_lstm = F.l1_loss(keypoints, gt_keypoint, reduction='mean')
+        loss_lstm = F.l1_loss(keypoints, gt_keypoints, reduction='mean')
         # index = gt_dict['index']
         # index = index.to(torch.long)
         # # width and height loss, better version
