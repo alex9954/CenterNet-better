@@ -38,14 +38,14 @@ class LSTMhead(nn.Module):
         self.down_ratio = cfg.MODEL.CENTERNET.DOWN_SCALE
         self.dot_dimension = cfg.MODEL.CENTERNET.DOT_DIMENSION
 
-    def forward(self, x, gt_dict):
+    def forward(self, x, gt_dict, scoremap):
         x = self.extraction(x)  # (B, DOT_DIMENSION, 128, 128)
         device = x.device if isinstance(x, torch.Tensor) else torch.device("cpu")
         B, D, H, W = x.size()
         x = x.view(B, D, H * W)
         if not self.training:  # inference
             # x = x[:, 0:gt_dict['object_count'], :, :]
-            keypoints, _ = torch.topk(x, self.dot_number, dim=-1)  # (B, D, dot_number)
+            keypoints, _ = torch.topk(scoremap, self.dot_number, dim=-1)  # (B, D, dot_number)
             # still a lot to add
         else:
             keypoints = []

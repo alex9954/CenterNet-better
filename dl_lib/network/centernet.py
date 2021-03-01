@@ -77,7 +77,7 @@ class CenterNet(nn.Module):
         features = self.backbone(images.tensor)
         up_fmap = self.upsample(features)
         scoremap = self.scoremap_head(up_fmap)
-        keypoints, gt_keypoints = self.lstm_head(up_fmap, gt_dict)
+        keypoints, gt_keypoints = self.lstm_head(up_fmap, gt_dict, scoremap)
         pred_dict = {
             "scoremap": scoremap,
             "keypoints": keypoints,
