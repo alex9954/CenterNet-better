@@ -31,21 +31,27 @@ class LSTMhead(nn.Module):
             bias_value=cfg.MODEL.CENTERNET.BIAS_VALUE,
         )
         self.dot_number = cfg.MODEL.CENTERNET.DOT_NUMBER
-        self.lstm = nn.LSTM(input_size=cfg.MODEL.CENTERNET.DOT_DIMENSION,
-                            hidden_size=2,
+        self.lstm_encoder = nn.LSTM(input_size=cfg.MODEL.CENTERNET.DOT_DIMENSION,
+                            hidden_size=128,
                             num_layers=1)
+        self.lstm_decoder = nn.LSTM(input_size=128,
+                            hidden_size=128,
+                            num_layers=1)
+        self.projection = nn.Sequential(nn.Linear(128, 64),
+                                        nn.ReLU(inplace=True),
+                                        nn.Linear(64, 2))
         self.image_size = cfg.MODEL.CENTERNET.IMAGE_SIZE
         self.down_ratio = cfg.MODEL.CENTERNET.DOWN_SCALE
         self.dot_dimension = cfg.MODEL.CENTERNET.DOT_DIMENSION
 
-    def forward(self, x, gt_dict):
+    def forward(self, x, gt_dict, scoremap):
         x = self.extraction(x)  # (B, DOT_DIMENSION, 128, 128)
         device = x.device if isinstance(x, torch.Tensor) else torch.device("cpu")
         B, D, H, W = x.size()
         x = x.view(B, D, H * W)
         if not self.training:  # inference
             # x = x[:, 0:gt_dict['object_count'], :, :]
-            keypoints, _ = torch.topk(x, self.dot_number, dim=-1)  # (B, D, dot_number)
+            keypoints, _ = torch.topk(scoremap, self.dot_number, dim=-1)  # (B, D, dot_number)
             # still a lot to add
         else:
             keypoints = []
@@ -75,8 +81,10 @@ class LSTMhead(nn.Module):
 
         keypoints = keypoints.view(-1, self.dot_number, self.dot_dimension)
         keypoints = keypoints.permute(1, 0, 2)  # (dot_number, B, D)
-        keypoints, (hn, cn) = self.lstm(keypoints)
-        keypoints = keypoints.permute(1, 0, 2)  # (B, dot_number, 2)
+        output_encoder, hidden_encoder = self.lstm_encoder(keypoints)
+        keypoints, hidden_decoder = self.lstm_decoder(output_encoder, hidden_encoder)
+        keypoints = keypoints.permute(1, 0, 2)  # (B, dot_number, 128)
+        keypoints = self.projection(keypoints)
         keypoints = keypoints.view(B, -1, self.dot_number, 2)
 
         return keypoints, gt_keypoints

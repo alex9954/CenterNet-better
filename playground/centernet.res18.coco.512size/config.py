@@ -67,7 +67,7 @@ _config_dict = dict(
             MAX_ITER=126000,
             WARMUP_ITERS=1000,
         ),
-        IMS_PER_BATCH=16,
+        IMS_PER_BATCH=128, #128
         CHECKPOINT_PERIOD=10000,
     ),
      OUTPUT_DIR=osp.join(

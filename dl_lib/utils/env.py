@@ -30,7 +30,7 @@ def seed_all_rng(seed=None):
         logger.info("Using a generated random seed {}".format(seed))
     np.random.seed(seed)
     torch.set_rng_state(torch.manual_seed(seed).get_state())
-    random.seed(seed)
+    random.seed(seed)  # seed
 
 
 # from https://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path

@@ -74,7 +74,7 @@ def benchmark_train(args):
     logger.info("Model:\n{}".format(model))
     if comm.get_world_size() > 1:
         model = DistributedDataParallel(
-            model, device_ids=[comm.get_local_rank()], broadcast_buffers=False
+            model, device_ids=[comm.get_local_rank()], broadcast_buffers=False, find_unused_parameters=True
         )
     optimizer = build_optimizer(cfg, model)
     checkpointer = DetectionCheckpointer(model, optimizer=optimizer)
