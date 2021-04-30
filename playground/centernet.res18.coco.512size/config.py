@@ -3,7 +3,7 @@ from dl_lib.configs.base_detection_config import BaseDetectionConfig
 
 _config_dict = dict(
     MODEL=dict(
-        WEIGHTS="",
+        WEIGHTS="D:/projects/CenterNet-better/playground/centernet.res18.coco.512size/model_final.pth",
         RESNETS=dict(DEPTH=18),
         PIXEL_MEAN=[0.485, 0.456, 0.406],
         PIXEL_STD=[0.229, 0.224, 0.225],
@@ -64,10 +64,10 @@ _config_dict = dict(
         LR_SCHEDULER=dict(
             GAMMA=0.1,
             STEPS=(81000, 108000),
-            MAX_ITER=126000,
+            MAX_ITER=126002,  # 126000
             WARMUP_ITERS=1000,
         ),
-        IMS_PER_BATCH=16,
+        IMS_PER_BATCH=1,
         CHECKPOINT_PERIOD=10000,
     ),
      OUTPUT_DIR=osp.join(

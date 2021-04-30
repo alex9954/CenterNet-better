@@ -4,6 +4,7 @@ import logging
 
 import numpy as np
 import torch
+import matplotlib.pyplot as plt
 from PIL import Image
 
 from dl_lib.utils.file_io import PathManager

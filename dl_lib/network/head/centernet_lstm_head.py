@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 import torchvision
 import numpy as np
-from torch.nn.utils.rnn import pad_sequence
+
+from ..generator import CenterNetDecoder, CenterNetGT
 
 class SingleHead(nn.Module):
 
@@ -31,9 +32,18 @@ class LSTMhead(nn.Module):
             bias_value=cfg.MODEL.CENTERNET.BIAS_VALUE,
         )
         self.dot_number = cfg.MODEL.CENTERNET.DOT_NUMBER
-        self.lstm = nn.LSTM(input_size=cfg.MODEL.CENTERNET.DOT_DIMENSION,
-                            hidden_size=2,
+        self.lstm_encoder = nn.LSTM(input_size=cfg.MODEL.CENTERNET.DOT_DIMENSION,
+                            hidden_size=128,
                             num_layers=1)
+        self.lstm_decoder = nn.LSTM(input_size=128,
+                            hidden_size=128,
+                            num_layers=1)
+        self.projection_x = nn.Sequential(nn.Linear(128, 64),
+                                        nn.ReLU(inplace=True),
+                                        nn.Linear(64, 1))
+        self.projection_y = nn.Sequential(nn.Linear(128, 64),
+                                          nn.ReLU(inplace=True),
+                                          nn.Linear(64, 1))
         self.image_size = cfg.MODEL.CENTERNET.IMAGE_SIZE
         self.down_ratio = cfg.MODEL.CENTERNET.DOWN_SCALE
         self.dot_dimension = cfg.MODEL.CENTERNET.DOT_DIMENSION
@@ -42,41 +52,89 @@ class LSTMhead(nn.Module):
         x = self.extraction(x)  # (B, DOT_DIMENSION, 128, 128)
         device = x.device if isinstance(x, torch.Tensor) else torch.device("cpu")
         B, D, H, W = x.size()
-        x = x.view(B, D, H * W)
-        if not self.training:  # inference
+        # if not self.training:  # inference
+        if False:
             # x = x[:, 0:gt_dict['object_count'], :, :]
-            keypoints, _ = torch.topk(scoremap, self.dot_number, dim=-1)  # (B, D, dot_number)
-            # still a lot to add
+            x = x.view(B, D, H, W)
+            fmap = CenterNetDecoder.pseudo_nms(scoremap)
+            scores, index, ys, xs = CenterNetDecoder.topk_score(fmap, K=self.dot_number)
+            object_count = gt_dict['object_count']
+            for i in range(object_count.size(0)-1):
+                x_point = xs[i, :int(object_count[i+1]), :]
+                y_point = ys[i, :int(object_count[i+1]), :]
+            index = torch.cat([x_point.unsqueeze(2), y_point.unsqueeze(2)], dim=2)
+            keypoints_per_image_x = []
+            keypoints_per_image_y = []
+            for k in range(index.size(0)):
+                dot_y = torch.stack([x[0, :, int(index[k][i][1]), int(index[k][i][0])] for i in range(index.size(1))], dim=0)
+                dot_x = torch.stack([x[0, :, int(index[k][i][0]), int(index[k][i][1])] for i in range(index.size(1))], dim=0)
+                keypoints_per_image_x.append(dot_x)
+                keypoints_per_image_y.append(dot_y)
+            keypoints_x = torch.stack(keypoints_per_image_x, dim=0)
+            keypoints_y = torch.stack(keypoints_per_image_y, dim=0)
+
+            mask_point = gt_dict['mask_point']
+            mask_point = [i // self.down_ratio for i in mask_point]
+            for i in range(len(mask_point)):
+                padding = torch.zeros((self.dot_number - mask_point[i].size(0) // 2) * 2, device=device)
+                mask_point[i] = torch.cat([mask_point[i].float().to(device), padding], dim=0)
+            gt_keypoints = torch.stack(mask_point, dim=0)
+            gt_keypoints = gt_keypoints.view(x.size(0), gt_keypoints.size(0), self.dot_number, 2)
         else:
-            keypoints = []
+            x = x.view(B, D, H * W)
+            keypoints_x = []
+            keypoints_y = []
             gt_keypoints = []
             object_per_image = gt_dict['object_count'].int()
             for i in range(object_per_image.size(0) - 1):
                 object_per_image[i+1][0] += object_per_image[i][0]
             mask_point = gt_dict['mask_point']
-            mask_point = [i / self.down_ratio for i in mask_point]
+            mask_point = [i // self.down_ratio for i in mask_point]
 
             # fetch corresponding pixels based on keypoint coordinates
             for i in range(B):
-                keypoints_per_image = []
+                keypoints_per_image_x = []
+                keypoints_per_image_y = []
                 gt_keypoints_per_image = []
                 for j in range(object_per_image[i][0].item(), object_per_image[i+1][0].item()):
                     index = mask_point[j].view(-1, 2)
                     index = index.clamp(max=127.0)
                     gt_keypoints_per_image.append(index * self.down_ratio)
-                    index = index[:, 1] * (self.image_size / self.down_ratio) + index[:, 0]
-                    dot = torch.stack([x[i, :, int(index[k].item())] for k in range(index.size(0))], dim=0)
-                    keypoints_per_image.append(dot)
-                keypoints.append(keypoints_per_image)
+                    # index_1 = index[:, 1] * (self.image_size / self.down_ratio) + index[:, 0]
+                    # dot_1 = torch.stack([x[i, :, int(index_1[k].item())] for k in range(index_1.size(0))], dim=0)
+                    x = x.view(B, D, H, W)
+
+                    dot_y = torch.stack([x[i, :, int(index[k][1]), int(index[k][0])] for k in range(index.size(0))], dim=0)
+                    dot_x = torch.stack([x[i, :, int(index[k][0]), int(index[k][1])] for k in range(index.size(0))],
+                                        dim=0)
+                    keypoints_per_image_x.append(dot_x)
+                    keypoints_per_image_y.append(dot_y)
+                keypoints_x.append(keypoints_per_image_x)
+                keypoints_y.append(keypoints_per_image_y)
                 gt_keypoints.append(gt_keypoints_per_image)
 
-            keypoints = self.padding(keypoints, device, gt=False)  # (B, max_instance, dot_number, D)
+            keypoints_x = self.padding(keypoints_x, device, gt=False)  # (B, max_instance, dot_number, D)
+            keypoints_y = self.padding(keypoints_y, device, gt=False)
             gt_keypoints = self.padding(gt_keypoints, device, gt=True)  # (B, max_instance, dot_number, D)
-
-        keypoints = keypoints.view(-1, self.dot_number, self.dot_dimension)
+        # import pdb;
+        # pdb.set_trace()
+        keypoints = keypoints_x.view(-1, self.dot_number, self.dot_dimension)
         keypoints = keypoints.permute(1, 0, 2)  # (dot_number, B, D)
-        keypoints, (hn, cn) = self.lstm(keypoints)
-        keypoints = keypoints.permute(1, 0, 2)  # (B, dot_number, 2)
+        output_encoder, hidden_encoder = self.lstm_encoder(keypoints)
+        keypoints, hidden_decoder_ = self.lstm_decoder(output_encoder, hidden_encoder)
+        keypoints = keypoints.permute(1, 0, 2)  # (B, dot_number, 128)
+        keypoints_xx = self.projection_x(keypoints)
+        keypoints_xy = self.projection_y(keypoints)
+
+        keypoints = keypoints_y.view(-1, self.dot_number, self.dot_dimension)
+        keypoints = keypoints.permute(1, 0, 2)  # (dot_number, B, D)
+        output_encoder, hidden_encoder = self.lstm_encoder(keypoints)
+        keypoints, hidden_decoder_ = self.lstm_decoder(output_encoder, hidden_encoder)
+        keypoints = keypoints.permute(1, 0, 2)  # (B, dot_number, 128)
+        keypoints_yx = self.projection_x(keypoints)
+        keypoints_yy = self.projection_y(keypoints)
+
+        keypoints = torch.cat([keypoints_xy, keypoints_yy], dim=2)
         keypoints = keypoints.view(B, -1, self.dot_number, 2)
 
         return keypoints, gt_keypoints

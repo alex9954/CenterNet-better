@@ -4,6 +4,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import matplotlib as plt
+import cv2
 
 from dl_lib.layers import ShapeSpec
 from dl_lib.structures import Boxes, ImageList, Instances
@@ -66,13 +68,13 @@ class CenterNet(nn.Module):
         Returns:
             dict[str: Tensor]:
         """
-        images = self.preprocess_image(batched_inputs)
+        images, images_show = self.preprocess_image(batched_inputs)
+        gt_dict = self.get_ground_truth(batched_inputs)
 
         if not self.training:
-            return self.inference(images)
+            return self.inference(images, gt_dict, images_show)
 
-        gt_dict = self.get_ground_truth(batched_inputs)
-        # self.inference(images, gt_dict)
+        self.inference(images, gt_dict, images_show)
 
         features = self.backbone(images.tensor)
         up_fmap = self.upsample(features)
@@ -85,9 +87,9 @@ class CenterNet(nn.Module):
 
         # gt_dict = self.get_ground_truth(batched_inputs)
 
-        return self.losses(pred_dict, gt_dict, gt_keypoints)
+        return self.losses(pred_dict, gt_dict, gt_keypoints, images_show)
 
-    def losses(self, pred_dict, gt_dict, gt_keypoints):
+    def losses(self, pred_dict, gt_dict, gt_keypoints, images_show):
         r"""
         calculate losses of pred and gt
 
@@ -118,6 +120,19 @@ class CenterNet(nn.Module):
 
         gt_keypoints = gt_keypoints / self.cfg.MODEL.CENTERNET.IMAGE_SIZE
         keypoints = pred_dict['keypoints']
+
+        for i, j in zip(keypoints[0], gt_keypoints[0]):
+            print(i * 512)
+            print(j * 512)
+            i = i.cpu().data.numpy() * 512
+            j = j.cpu().data.numpy() * 512
+            plt.imshow(images_show[0].cpu().numpy().transpose(1, 2, 0))
+            # plt.scatter(i[:, 1], i[:, 0], color='b')
+            plt.scatter(i[:, 0], i[:, 1], color='g')
+            plt.scatter(j[:, 0], j[:, 1], color='r')
+            plt.show()
+
+
         loss_lstm = F.l1_loss(keypoints, gt_keypoints, reduction='mean')
         # index = gt_dict['index']
         # index = index.to(torch.long)
@@ -149,7 +164,7 @@ class CenterNet(nn.Module):
         return CenterNetGT.generate(self.cfg, batched_inputs, )
 
     @torch.no_grad()
-    def inference(self, images, gt_dict):
+    def inference(self, images, gt_dict, images_show):
         """
         image(tensor): ImageList in dl_lib.structures
         """
@@ -171,21 +186,34 @@ class CenterNet(nn.Module):
 
         features = self.backbone(aligned_img)
         up_fmap = self.upsample(features)
-        pred_dict = self.scoremap_head(up_fmap)
-        results = self.decode_prediction(pred_dict, img_info, images, gt_dict)
+        scoremap = self.scoremap_head(up_fmap)
+        keypoints, gt_keypoints = self.lstm_head(up_fmap, gt_dict, scoremap)
+
+        # for i, j in zip(keypoints[0], gt_keypoints[0]):
+        #     print(i * 512)
+        #     print(j * 4)
+        #     i = i.cpu().data.numpy() * 512
+        #     j = j.cpu().data.numpy() * 4
+        #     plt.imshow(images_show[0].cpu().numpy().transpose(1, 2, 0))
+        #     # plt.scatter(i[:, 1], i[:, 0], color='b')
+        #     plt.scatter(i[:, 0], i[:, 1], color='g')
+        #     plt.scatter(j[:, 0], j[:, 1], color='r')
+        #     plt.show()
+
+        results = self.decode_prediction(scoremap, img_info, aligned_img, gt_dict, images_show)
 
         ori_w, ori_h = img_info['center'] * 2
         det_instance = Instances((int(ori_h), int(ori_w)), **results)
 
         return [{"instances": det_instance}]
 
-    def decode_prediction(self, pred_dict, img_info, images, gt_dict):
+    def decode_prediction(self, pred_dict, img_info, images, gt_dict, images_show):
         """
         Args:
             pred_dict(dict): a dict contains all information of prediction
             img_info(dict): a dict contains needed information of origin image
         """
-        fmap = pred_dict["cls"]
+        fmap = pred_dict
         # reg = pred_dict["reg"]
         # wh = pred_dict["wh"]
 
@@ -194,7 +222,7 @@ class CenterNet(nn.Module):
         # scores = scores.reshape(-1)
         # classes = classes.reshape(-1).to(torch.int64)
 
-        # # dets = CenterNetDecoder.decode(fmap, wh, reg)
+        # dets = CenterNetDecoder.decode(fmap, wh, reg)
         # boxes = CenterNetDecoder.transform_boxes(boxes, img_info)
         # boxes = Boxes(boxes)
         # return dict(pred_boxes=boxes, scores=scores, pred_classes=classes)
@@ -202,29 +230,28 @@ class CenterNet(nn.Module):
         gt_scoremap = gt_dict['score_map']
         gt_scoremap = gt_scoremap.cpu().numpy()[0]
         gt_scoremap *= 10
-        images = images.tensor
-        images = images[0].permute(1, 2, 0)
-        images = images.cpu()
+        images_show = images_show[0].cpu().numpy().transpose(1,2,0)
+        images_show = cv2.cvtColor(images_show, cv2.COLOR_BGR2RGB)
         fmap = fmap.cpu()
         plt.figure()
-        plt.imshow(images.numpy(), origin='upper')
+        plt.imshow(images_show)
         plt.figure()
         plt.subplot(421)
-        plt.imshow(fmap.cpu().numpy()[0][0], origin='upper')
+        plt.imshow(fmap.cpu().numpy()[0][0])
         plt.subplot(422)
-        plt.imshow(gt_scoremap[0], origin='upper')
+        plt.imshow(gt_scoremap[0])
         plt.subplot(423)
-        plt.imshow(fmap.cpu().numpy()[0][1], origin='upper')
+        plt.imshow(fmap.cpu().numpy()[0][1])
         plt.subplot(424)
-        plt.imshow(gt_scoremap[1], origin='upper')
+        plt.imshow(gt_scoremap[1])
         plt.subplot(425)
-        plt.imshow(fmap.cpu().numpy()[0][2], origin='upper')
+        plt.imshow(fmap.cpu().numpy()[0][2])
         plt.subplot(426)
-        plt.imshow(gt_scoremap[2], origin='upper')
+        plt.imshow(gt_scoremap[2])
         plt.subplot(427)
-        plt.imshow(fmap.cpu().numpy()[0][3], origin='upper')
+        plt.imshow(fmap.cpu().numpy()[0][3])
         plt.subplot(428)
-        plt.imshow(gt_scoremap[3], origin='upper')
+        plt.imshow(gt_scoremap[3])
         plt.show()
 
 
@@ -233,6 +260,7 @@ class CenterNet(nn.Module):
         Normalize, pad and batch the input images.
         """
         images = [x["image"].to(self.device) for x in batched_inputs]
+        images_show = images
         images = [self.normalizer(img / 255) for img in images]
         images = ImageList.from_tensors(images, self.backbone.size_divisibility)
-        return images
+        return images, images_show

@@ -65,6 +65,11 @@ class CenterNetGT(object):
             object_count_list.append(torch.Tensor([num_boxes]))
             for i in mask_point.polygons:
                 mask_point_list.append(torch.from_numpy(i[0]))
+                # tmp = torch.from_numpy(i[0]).view(-1, 2)
+                # x = tmp[:, 0].unsqueeze(1)
+                # y = tmp[:, 1].unsqueeze(1)
+                # result = torch.cat([y, x], dim=1).view(-1, 1).squeeze(1)
+                # mask_point_list.append(result)
             # wh_list.append(gt_wh)
             # reg_list.append(gt_reg)
             # reg_mask_list.append(reg_mask)
